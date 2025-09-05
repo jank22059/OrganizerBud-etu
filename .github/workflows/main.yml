@@ -1,0 +1,84 @@
+name: Build APK with Icon
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check for icon file
+      run: |
+        if [ -f "assets/icon.jpg" ]; then
+          echo "JPG icon found!"
+        elif [ -f "assets/icon.png" ]; then
+          echo "PNG icon found!"
+        elif [ -f "icon.jpg" ]; then
+          echo "Root JPG icon found!"
+          mkdir -p assets
+          cp icon.jpg assets/icon.jpg
+        elif [ -f "icon.png" ]; then
+          echo "Root PNG icon found!"
+          mkdir -p assets
+          cp icon.png assets/icon.png
+        else
+          echo "No icon found! Creating default..."
+          mkdir -p assets
+          # Tworzymy prostą ikonę programowo
+          python -c "
+          from PIL import Image, ImageDraw, ImageFont
+          img = Image.new('RGB', (512, 512), color='#4CAF50')
+          d = ImageDraw.Draw(img)
+          try:
+              fnt = ImageFont.truetype('Arial', 100)
+          except:
+              fnt = ImageFont.load_default()
+          d.text((150, 200), '💰', fill='white', font=fnt)
+          d.text((100, 300), 'BUDŻET', fill='white', font=fnt)
+          img.save('assets/icon.jpg')
+          "
+        fi
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-pip \
+          git \
+          wget \
+          unzip \
+          openjdk-11-jdk \
+          python3-pil  # For image processing
+
+    - name: Install Buildozer
+      run: |
+        pip install buildozer
+        pip install pillow  # For image manipulation
+
+    - name: Build APK
+      run: |
+        buildozer android debug --verbose
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OrganizerBudzetu-APK
+        path: bin/*.apk
+
+    - name: Upload icon preview
+      uses: actions/upload-artifact@v4
+      with:
+        name: Icon-Preview
+        path: assets/icon.*
